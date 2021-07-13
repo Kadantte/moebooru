@@ -178,17 +178,13 @@ class User < ApplicationRecord
     def to_xml(options = {})
       options[:indent] ||= 2
       xml = options[:builder] ||= Builder::XmlMarkup.new(:indent => options[:indent])
-      xml.post(:name => name, :id => id) do
-        blacklisted_tags_array.each do |t|
-          xml.blacklisted_tag(:tag => t)
-        end
-
+      xml.user(:name => name, :id => id) do
         yield options[:builder] if block_given?
       end
     end
 
     def as_json(*args)
-      { :name => name, :blacklisted_tags => blacklisted_tags_array, :id => id }.as_json(*args)
+      { :name => name, :id => id }.as_json(*args)
     end
 
     def user_info_cookie
@@ -665,7 +661,7 @@ class User < ApplicationRecord
   def self.with_params(params)
     res = all
 
-    res = res.where("name ILIKE ?", "*#{params[:name].tr(" ", "_")}*".to_escaped_for_sql_like) if params[:name]
+    res = res.where("name ILIKE ?", "*#{params[:name].tr(" ", "_")}*".to_escaped_for_sql_like) if params[:name].is_a?(String) && params[:name].present?
     res = res.where(:level => params[:level]) if params[:level] && params[:level] != "any"
     res = res.where(:id => params[:id]) if params[:id]
 
