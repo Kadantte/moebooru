@@ -12,30 +12,29 @@ Requirements
 
 As this is ongoing project, there will be more changes on requirement as this project goes. Currently this application is developed using:
 
-* Ruby (2.6 or later)
-* PostgreSQL (11 or later)
+* Ruby (3.3 or later)
+* PostgreSQL (15 or later)
 * Bundler gem
-* node.js (10.17 or later)
-* yarn
+* node.js (20.0 or later)
 * ImageMagick
 * And various other requirement for the gems (check `Gemfile` for the list)
 
-On RHEL5 (and 6), it goes like this (outdated list):
+On RHEL, it goes like this (untested):
 
+* ImageMagick
 * gcc
 * gcc-c++
-* ImageMagick
+* git
 * jhead
 * libxslt-devel
 * libyaml-devel
-* git
+* nodejs
 * openssl-devel
 * pcre-devel
-* postgresql94-devel
-* postgresql94-server
-* readline-devel
+* postgresql15-devel
+* postgresql15-server
 
-Base, EPEL, and postgresql official repositories contain all the requirements.
+Base, EPEL, dnf module, and postgresql official repositories contain all the requirements.
 
 Installation
 ------------
@@ -47,13 +46,14 @@ After initializing PostgreSQL database, create user for moebooru with `createdb`
     postgres# create user moebooru_user with password 'the_password' createdb;
 
 
-### Rails Setup
+### Rails Setup (development)
 
 * Run `bundle install`
 * Create `config/database.yml` and `config/local_config.rb`
 * Initialize database with `bundle exec rake db:reset`
 * Run `bundle exec rake db:migrate`
-* Start the server (`bundle exec unicorn` or `bundle exec puma` if using JRuby/Rubinius)
+* Start the server (`bundle exec rails server`)
+* Start asset builder server (`npm run build -- --watch`)
 
 Configuration
 -------------
@@ -65,10 +65,6 @@ See `config/local_config.rb.example`. Additionally, as I move to ENV-based confi
 - `MB_PIWIK_HOST`: sets the host this application will attempt to contact a Piwik installation at. Defaults to false to not use Piwik if unset.
 - `MB_PIWIK_ID`: sets the Site ID this application will send analytics data for.
 - `MB_THREADS`: sets number of threads this application is running. Currently used to determine number of connection pool for `memcached`. Defaults to 1 if unset.
-
-### Additional configuration for web server
-
-On setup with separate image servers, additional configuration is required for avatar and inline image cropping to work. Specifically, due to how the image cropping library works, the image servers need to allow [CORS](https://en.wikipedia.org/wiki/Cross-origin_resource_sharing) for image access from main url.
 
 Plans
 -----

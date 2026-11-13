@@ -1,17 +1,17 @@
 module Post::SqlMethods
   module ClassMethods
     def find_by_tag_join(tag, options = {})
-      joins(:_tags).where(:tags => { :name => tag.downcase.tr(" ", "_") })
+      joins(:_tags).where(tags: { name: tag.downcase.tr(" ", "_") })
         .limit(options[:limit])
         .offset(options[:offset])
-        .order(options[:order] || { :id => :desc })
+        .order(options[:order] || { id: :desc })
     end
 
     def sql_range_for_where(parsed_query, field)
       conds = []
       params = []
       generate_sql_range_helper(parsed_query, field, conds, params)
-      [*conds, *params]
+      [ *conds, *params ]
     end
 
     def generate_sql_range_helper(arr, field, c, p)
@@ -42,7 +42,7 @@ module Post::SqlMethods
         p << arr[2]
 
       when :in
-        items = ["?"] * arr[1].length
+        items = [ "?" ] * arr[1].length
         c << "#{field} IN (#{items.join(", ")})"
         p.concat(arr[1])
 
@@ -57,8 +57,8 @@ module Post::SqlMethods
         q = Tag.parse_query(q)
       end
 
-      conds = ["true"]
-      joins = ["posts p"]
+      conds = [ "true" ]
+      joins = [ "posts p" ]
       join_params = []
       cond_params = []
 
@@ -66,6 +66,7 @@ module Post::SqlMethods
         conds << "FALSE"
       end
 
+      generate_sql_range_helper(q[:ratio], "ratio", conds, cond_params)
       generate_sql_range_helper(q[:post_id], "p.id", conds, cond_params)
       generate_sql_range_helper(q[:mpixels], "p.width*p.height/1000000.0", conds, cond_params)
       generate_sql_range_helper(q[:width], "p.width", conds, cond_params)
@@ -147,13 +148,13 @@ module Post::SqlMethods
       if q.key?(:exclude_pools)
         q[:exclude_pools].each_index do |i|
           if q[:exclude_pools][i].is_a?(Integer)
-            joins << "LEFT JOIN pools_posts ep#{i} ON (ep#{i}.post_id = p.id AND ep#{i}.pool_id = ?)"
+            joins << "LEFT JOIN pools_posts ep#{i} ON (ep#{i}.active AND ep#{i}.post_id = p.id AND ep#{i}.pool_id = ?)"
             join_params << q[:exclude_pools][i]
             conds << "ep#{i} IS NULL"
           end
 
           if q[:exclude_pools][i].is_a?(String)
-            joins << "LEFT JOIN pools_posts ep#{i} ON ep#{i}.post_id = p.id LEFT JOIN pools epp#{i} ON (ep#{i}.pool_id = epp#{i}.id AND epp#{i}.name ILIKE ? ESCAPE E'\\\\')"
+            joins << "LEFT JOIN pools_posts ep#{i} ON (ep#{i}.active AND ep#{i}.post_id = p.id) LEFT JOIN pools epp#{i} ON (ep#{i}.pool_id = epp#{i}.id AND epp#{i}.name ILIKE ? ESCAPE E'\\\\')"
             join_params << ("%" + q[:exclude_pools][i].to_escaped_for_sql_like + "%")
             conds << "ep#{i} IS NULL"
           end
@@ -314,15 +315,15 @@ module Post::SqlMethods
           sql << " ORDER BY width*height/1000000.0"
 
         when "portrait"
-          sql << " ORDER BY 1.0*width/GREATEST(1, height)"
+          sql << " ORDER BY ratio"
 
         when "landscape"
-          sql << " ORDER BY 1.0*width/GREATEST(1, height) DESC"
+          sql << " ORDER BY ratio DESC"
 
         when "portrait_pool"
           # We can only do this if we're searching for a pool.
           if q.key?(:pool)
-            sql << " ORDER BY 1.0*width / GREATEST(1, height), nat_sort(pools_posts.sequence), pools_posts.post_id"
+            sql << " ORDER BY ratio, nat_sort(pools_posts.sequence), pools_posts.post_id"
           end
 
         when "change", "change_asc"
@@ -342,6 +343,7 @@ module Post::SqlMethods
           end
 
         when "random"
+          options[:offset] = nil
           sql << " ORDER BY random()"
 
         else
@@ -374,7 +376,7 @@ module Post::SqlMethods
 
       params = join_params + cond_params
 
-      Post.sanitize_sql_array([sql, *params])
+      Post.sanitize_sql_array([ sql, *params ])
     end
   end
 

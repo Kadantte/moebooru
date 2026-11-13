@@ -1,0 +1,40 @@
+import DragElement from 'src/classes/drag_element';
+
+export default class SwipeHandler {
+  constructor (element) {
+    this.element = element;
+    this.dragger = new DragElement(element, {
+      ondrag: this.ondrag,
+      onstartdrag: this.startdrag
+    });
+  }
+
+  startdrag = () => {
+    this.swiped_horizontal = false;
+    this.swiped_vertical = false;
+  };
+
+  ondrag = (e) => {
+    if (!this.swiped_horizontal) {
+      // XXX: need a guessed DPI
+      if (Math.abs(e.aX) > 100) {
+        this.element.fire('swipe:horizontal', {
+          right: e.aX > 0
+        });
+        this.swiped_horizontal = true;
+      }
+    }
+    if (!this.swiped_vertical) {
+      if (Math.abs(e.aY) > 100) {
+        this.element.fire('swipe:vertical', {
+          down: e.aY > 0
+        });
+        this.swiped_vertical = true;
+      }
+    }
+  };
+
+  destroy () {
+    this.dragger.destroy();
+  }
+}

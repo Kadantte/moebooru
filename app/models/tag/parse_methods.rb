@@ -9,16 +9,19 @@ module Tag::ParseMethods
     end
 
     def parse_cast(x, type)
-      if type == :integer
+      case type
+      when :integer
         x.to_i
-      elsif type == :float
+      when :float
         x.to_f
-      elsif type == :date
+      when :date
         begin
           x.to_date
         rescue
           nil
         end
+      when :rational
+        x.tr(":", "/").to_r.to_f.round(3) rescue 0
       end
     end
 
@@ -27,29 +30,29 @@ module Tag::ParseMethods
       # (-?(\d+(\.\d*)?|\d*\.\d+))
       case range
       when /^(.+?)\.\.(.+)/
-        return [:between, parse_cast(Regexp.last_match[1], type), parse_cast(Regexp.last_match[2], type)]
+        [ :between, parse_cast(Regexp.last_match[1], type), parse_cast(Regexp.last_match[2], type) ]
 
       when /^<=(.+)/, /^\.\.(.+)/
-        return [:lte, parse_cast(Regexp.last_match[1], type)]
+        [ :lte, parse_cast(Regexp.last_match[1], type) ]
 
       when /^<(.+)/
-        return [:lt, parse_cast(Regexp.last_match[1], type)]
+        [ :lt, parse_cast(Regexp.last_match[1], type) ]
 
       when /^>=(.+)/, /^(.+)\.\.$/
-        return [:gte, parse_cast(Regexp.last_match[1], type)]
+        [ :gte, parse_cast(Regexp.last_match[1], type) ]
 
       when /^>(.+)/
-        return [:gt, parse_cast(Regexp.last_match[1], type)]
+        [ :gt, parse_cast(Regexp.last_match[1], type) ]
 
       when /^(.+?),(.+)/
         items = range.split(",").map do |val|
           parse_cast(val, type)
         end
 
-        return [:in, items]
+        [ :in, items ]
 
       else
-        return [:eq, parse_cast(range, type)]
+        [ :eq, parse_cast(range, type) ]
 
       end
     end
@@ -68,13 +71,15 @@ module Tag::ParseMethods
           next
         end
 
-        if token =~ /^(unlocked|deleted|ext|user|sub|vote|-vote|fav|md5|-rating|rating|width|height|mpixels|score|source|id|date|pool|-pool|parent|order|change|holds|pending|shown|limit):(.+)$/
+        if token =~ /^(ratio|unlocked|deleted|ext|user|sub|vote|-vote|fav|md5|-rating|rating|width|height|mpixels|score|source|id|date|pool|-pool|parent|order|change|holds|pending|shown|limit):(.+)$/
           if Regexp.last_match[1] == "user"
             q[:user] = Regexp.last_match[2]
+          elsif Regexp.last_match[1] == "ratio"
+            q[:ratio] = parse_helper(Regexp.last_match[2], :rational)
           elsif Regexp.last_match[1] == "vote"
             vote, user = Regexp.last_match[2].split(":", 2)
             user_id = User.find_by_name(user).id rescue nil
-            q[:vote] = [parse_helper(vote), user_id]
+            q[:vote] = [ parse_helper(vote), user_id ]
           elsif Regexp.last_match[1] == "-vote"
             q[:vote_negated] = User.find_by_name(Regexp.last_match[2]).id rescue nil
             q[:error] = "no user named %s" % user if q[:vote_negated].nil?
@@ -164,8 +169,8 @@ module Tag::ParseMethods
         elsif token[0] == "~" && token.size > 1
           q[:include] << token[1..-1]
         elsif token.include?("*")
-          matches = where("name LIKE ?", token.to_escaped_for_sql_like).select(:name, :post_count).limit(25).order(:post_count => :desc).pluck(:name)
-          matches = ["~no_matches~"] if matches.empty?
+          matches = where("name LIKE ?", token.to_escaped_for_sql_like).select(:name, :post_count).limit(25).order(post_count: :desc).pluck(:name)
+          matches = [ "~no_matches~" ] if matches.empty?
           q[:include] += matches
         else
           q[:related] << token

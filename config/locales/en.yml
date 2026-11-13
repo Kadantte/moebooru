@@ -173,6 +173,11 @@ en:
     show:
       return: Return to post
       title: Comment
+  common:
+    count:
+      post:
+        one: '%{count} post'
+        other: '%{count} posts'
   confirmations:
     is_sure: Are you sure?
   dmail:
@@ -642,6 +647,7 @@ en:
       hidden_posts: Hidden Posts
       info: Posts containing all tags will be hidden. Seperate tags with spaces.
     browse:
+      add: Add frame
       by:
         # Posted / <x> ago / by <user>
         all_html: '%{text} %{ago} %{by}'
@@ -724,8 +730,7 @@ en:
       activate: Activate all held posts
       ambiguous: The following tags are ambiguous
       edit_tags: Edit Tags
-      held_html: You have held %{count}
-      held_view: view
+      held_html: You have held %{posts}.
       maybe_you_meant: Maybe you meant
       mode: Mode
       mode_form:

@@ -10,7 +10,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:14
+        image: postgres:18
         env:
           POSTGRES_PASSWORD: postgres
         ports: ['5432:5432']
@@ -25,17 +25,29 @@ jobs:
         ports: ['11211:11211']
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
-    - uses: actions/setup-node@v1
+    - name: Install additional packages
+      run: |
+        sudo apt-get update
+        sudo apt-get install imagemagick
+
+    - uses: actions/setup-node@v4
+      with:
+        cache: npm
+
+    - run: npm install
 
     - uses: ruby/setup-ruby@v1
       with:
-        ruby-version: 2.7
+        ruby-version: 3.4
         bundler-cache: true
 
     - name: Setup environment
       run: ./script/gh-action-prepare
+
+    #- name: Lint assets
+    #  run: npm run lint
 
     - name: Build assets
       run: bundle exec rails assets:precompile

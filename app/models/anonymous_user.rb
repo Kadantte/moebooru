@@ -1,5 +1,8 @@
 # encoding: utf-8
+
 class AnonymousUser
+  include Singleton
+
   def id
     0
   end
@@ -22,6 +25,10 @@ class AnonymousUser
     false
   end
 
+  def held_post_count
+    0
+  end
+
   def can_change?(record, attribute)
     method = "can_change_#{attribute}?"
     if record.respond_to?(method)
@@ -31,6 +38,10 @@ class AnonymousUser
     else
       false
     end
+  end
+
+  def show_advanced_editing
+    false
   end
 
   def show_samples?
@@ -79,5 +90,9 @@ class AnonymousUser
 
   def blacklisted_tags_array
     CONFIG["default_blacklists"]
+  end
+
+  def last_forum_topic_read_at
+    Time.now
   end
 end

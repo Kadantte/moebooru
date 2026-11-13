@@ -36,10 +36,9 @@
 
   <script type="text/javascript">
     InitTextAreas();
-    InitAdvancedEditing();
     Post.InitBrowserLinks();
     if(TagCompletion)
-      TagCompletion.init(<%= json_escape Tag.get_summary_version.to_json.html_safe %>);
+      TagCompletion.init(<%= json_escape Tag.get_summary_version.to_s.to_json.html_safe %>);
   </script>
 
   <!--[if lt IE 7]>

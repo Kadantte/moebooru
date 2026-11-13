@@ -39,13 +39,13 @@ module Moebooru
       write_crop = "#{output_size[:crop_width]}x#{output_size[:crop_height]}+#{output_size[:crop_left]}+#{output_size[:crop_top]}"
 
       write_format = output_path.split(".")[-1]
-      if write_format =~ /\A(jpe?g|gif|png)\z/i
+      if write_format =~ /\A(jpe?g|gif|png|webp)\z/i
         write_format = write_format.downcase
       else
         write_format = file_ext
       end
 
-      MiniMagick::Tool::Convert.new do |convert|
+      MiniMagick.convert do |convert|
         convert << input_path
         convert.background BGCOLOR
         convert.flatten
@@ -53,7 +53,7 @@ module Moebooru
         convert.crop write_crop
         convert.resize write_size
         convert.repage.+
-        convert.interlace 'Line'
+        convert.interlace "Line"
 
         if write_format =~ /\Ajpe?g\z/
           convert.sampling_factor "2x2,1x1,1x1"

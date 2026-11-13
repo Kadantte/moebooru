@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html class="action-<%= params[:controller] %> action-<%= params[:controller] %>-<%= params[:action] %> hide-advanced-editing">
+<html class="action-<%= params[:controller] %> action-<%= params[:controller] %>-<%= params[:action] %> <%= 'hide-advanced-editing' if !@current_user.show_advanced_editing %>">
 <head>
 <% if params[:tags] =~ /(\A(source:|fav:|date:|rating:|mpixels:|parent:|sub:|vote:|score:|order:|user:|limit:|holds:|pool:|[~-])|[ *])/ %>
 <meta name="robots" content="noindex, follow">
@@ -40,8 +40,8 @@
     }
   </script>
 
-  <%= javascript_include_tag 'application' %>
-  <%= javascript_pack_tag :application %>
+  <%= javascript_include_tag :application_classic %>
+  <%= javascript_include_tag 'application.jsout', extname: false %>
 
   <%= tag :link, :rel => 'search', :type => Mime[:opensearch], :href => opensearch_path(:xml), :title => CONFIG['app_name'] %>
   <%= CONFIG["custom_html_headers"] %>

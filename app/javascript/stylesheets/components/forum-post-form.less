@@ -1,0 +1,40 @@
+.forum-post-form {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  gap: var(--gap);
+
+  width: @page-width;
+  max-width: 100%;
+
+  --body-height: 400px;
+  --gap: 4px;
+
+  &--reply {
+    --body-height: 200px;
+  }
+
+  &__row {
+    &--body {
+      height: var(--body-height);
+    }
+
+    &--buttons {
+      display: flex;
+      gap: var(--gap);
+    }
+
+    &--title {
+      display: flex;
+    }
+  }
+
+  &__title-input {
+    flex: 1;
+  }
+
+  &__title-label {
+    flex: none;
+    margin-right: 10px;
+  }
+}

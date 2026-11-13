@@ -1,4 +1,6 @@
 class User < ApplicationRecord
+  include Moebooru::TempfilePrefix
+
   has_many :user_logs
   has_many :post_votes
   attr_accessor :current_email
@@ -8,17 +10,17 @@ class User < ApplicationRecord
   end
 
   def self.authenticate_with_api_key(username, api_key)
-    where(:name => username, :api_key => api_key).first
+    where(name: username, api_key: api_key).first
   end
 
   def log(ip)
-    Rails.cache.fetch({ :type => :user_logs, :id => id, :ip => ip }, :expires_in => 10.minutes) do
-      Rails.cache.fetch({ :type => :user_logs, :id => :all }, :expires_in => 1.day) do
+    Rails.cache.fetch({ type: :user_logs, id: id, ip: ip }, expires_in: 10.minutes) do
+      Rails.cache.fetch({ type: :user_logs, id: :all }, expires_in: 1.day) do
         UserLog.where("created_at < ?", 15.days.ago).delete_all
       end
       begin
         current_time = Time.now
-        user_logs.find_or_initialize_by(ip_addr: ip).update created_at: current_time
+        UserLog.upsert({ user_id: id, ip_addr: ip, created_at: current_time }, unique_by: %i[user_id ip_addr])
         update_column :last_logged_in_at, current_time
       # Once in a blue moon there will be race condition on find_or_initialize
       # resulting unique key constraint violation.
@@ -42,7 +44,7 @@ class User < ApplicationRecord
     def self.included(m)
       m.after_save :commit_blacklists
       m.after_create :set_default_blacklisted_tags
-      m.has_many :user_blacklisted_tags, lambda { order "id" }, :dependent => :delete_all
+      m.has_many :user_blacklisted_tags, lambda { order "id" }, dependent: :delete_all
     end
 
     attr_writer :blacklisted_tags
@@ -64,14 +66,14 @@ class User < ApplicationRecord
         user_blacklisted_tags.clear
 
         @blacklisted_tags.scan(/[^\r\n]+/).each do |tags|
-          user_blacklisted_tags.create(:tags => tags)
+          user_blacklisted_tags.create(tags: tags)
         end
       end
     end
 
     def set_default_blacklisted_tags
       CONFIG["default_blacklists"].each do |b|
-        UserBlacklistedTag.create(:user_id => id, :tags => b)
+        UserBlacklistedTag.create(user_id: id, tags: b)
       end
     end
   end
@@ -105,7 +107,7 @@ class User < ApplicationRecord
 
     def self.included(m)
       m.before_save :encrypt_password
-      m.validates_length_of :password, :minimum => 5, :if => lambda { |rec| rec.password }
+      m.validates_length_of :password, minimum: 5, if: lambda { |rec| rec.password }
       m.validates_confirmation_of :password
       # Changing password requires current password.
       m.validate :validate_current_password
@@ -147,7 +149,7 @@ class User < ApplicationRecord
   module UserNameMethods
     module ClassMethods
       def find_name(user_id)
-        (select(:name).find_by(:id => user_id) || AnonymousUser.new).name
+        (select(:name).find_by(id: user_id) || AnonymousUser.instance).name
       end
 
       def find_by_name(name)
@@ -157,38 +159,33 @@ class User < ApplicationRecord
 
     def self.included(m)
       m.extend(ClassMethods)
-      m.validates_length_of :name, :within => 2..20, :on => :create
-      m.validates_format_of :name, :with => /\A[^\p{Space};,]+\Z/, :on => :create, :message => "cannot have whitespace, commas, or semicolons"
+      m.validates_length_of :name, within: 2..20, on: :create
+      m.validates_format_of :name, with: /\A[^\p{Space};,]+\Z/, on: :create, message: "cannot have whitespace, commas, or semicolons"
       #      validates_format_of :name, :with => /^(Anonymous|[Aa]dministrator)/, :on => :create, :message => "this is a disallowed username"
-      m.validates_uniqueness_of :name, :case_sensitive => false, :on => :create
-      m.after_save :update_cached_name
+      m.validates_uniqueness_of :name, case_sensitive: false, on: :create
     end
 
     # FIXME: nuke this
     def pretty_name
       name
     end
-
-    def update_cached_name
-      Rails.cache.write("user_name:#{id}", name)
-    end
   end
 
   module UserApiMethods
     def to_xml(options = {})
       options[:indent] ||= 2
-      xml = options[:builder] ||= Builder::XmlMarkup.new(:indent => options[:indent])
-      xml.user(:name => name, :id => id) do
+      xml = options[:builder] ||= Builder::XmlMarkup.new(indent: options[:indent])
+      xml.user(name: name, id: id) do
         yield options[:builder] if block_given?
       end
     end
 
     def as_json(*args)
-      { :name => name, :id => id }.as_json(*args)
+      { name: name, id: id }.as_json(*args)
     end
 
     def user_info_cookie
-      [id, level, use_browser ? "1" : "0"].join(";")
+      [ id, level, use_browser ? "1" : "0" ].join(";")
     end
   end
 
@@ -235,7 +232,7 @@ class User < ApplicationRecord
 
       uploaded_tags = select_all_sql(sql)
 
-      Rails.cache.write("uploaded_tags/#{id}/#{type}", uploaded_tags, :expires_in => 1.day)
+      Rails.cache.write("uploaded_tags/#{id}/#{type}", uploaded_tags, expires_in: 1.day)
 
       uploaded_tags
     end
@@ -282,7 +279,7 @@ class User < ApplicationRecord
 
       favorite_tags = select_all_sql(sql)
 
-      Rails.cache.write("favorite_tags/#{id}/#{type}", favorite_tags, :expires_in => 1.day)
+      Rails.cache.write("favorite_tags/#{id}/#{type}", favorite_tags, expires_in: 1.day)
 
       favorite_tags
     end
@@ -296,23 +293,23 @@ class User < ApplicationRecord
     end
 
     def recent_uploaded_posts
-      posts.available.order(:id => :desc).limit(6)
+      posts.available.order(id: :desc).limit(6)
     end
 
     def recent_favorite_posts
-      Post.available.joins(:post_votes).where(:post_votes => { :user_id => id, :score => 3 }).order("post_votes.id DESC").limit(6)
+      Post.available.joins(:post_votes).where(post_votes: { user_id: id, score: 3 }).order("post_votes.id DESC").limit(6)
     end
 
     def favorite_post_count(_options = {})
-      post_votes.where(:score => 3).count
+      post_votes.where(score: 3).count
     end
 
     def post_count
-      @post_count ||= posts.where(:status => "active").count
+      @post_count ||= posts.where(status: "active").count
     end
 
     def held_post_count
-      posts.available.where(:is_held => true).count
+      posts.available.where(is_held: true).count
     end
   end
 
@@ -333,9 +330,9 @@ class User < ApplicationRecord
                      else
                        CONFIG["starting_level"]
                      end
-                   else
+      else
                      CONFIG["user_levels"]["Admin"]
-                   end
+      end
 
       self.last_logged_in_at = Time.now
     end
@@ -426,13 +423,13 @@ class User < ApplicationRecord
         raise ActiveRecord::RecordNotFound
       end
 
-      if UserRecord.exists?(["user_id = ? AND is_positive = false AND reported_by IN (SELECT id FROM users WHERE level >= ?)", invitee.id, CONFIG["user_levels"]["Mod"]]) && !is_admin?
+      if UserRecord.exists?([ "user_id = ? AND is_positive = false AND reported_by IN (SELECT id FROM users WHERE level >= ?)", invitee.id, CONFIG["user_levels"]["Mod"] ]) && !is_admin?
         raise HasNegativeRecord
       end
 
       transaction do
         if level == CONFIG["user_levels"]["Contributor"]
-          Post.where(:status => "pending", :user_id => id).find_each do |post|
+          Post.where(status: "pending", user_id: id).find_each do |post|
             post.approve!(id)
           end
         end
@@ -455,7 +452,7 @@ class User < ApplicationRecord
 
     def self.included(m)
       m.extend(ClassMethods)
-      m.belongs_to :avatar_post, :class_name => "Post"
+      m.belongs_to :avatar_post, class_name: "Post"
     end
 
     def avatar_url
@@ -477,7 +474,7 @@ class User < ApplicationRecord
         return false
       end
 
-      [:top, :bottom, :left, :right].each { |d| params[d] = params[d].to_f }
+      [ :top, :bottom, :left, :right ].each { |d| params[d] = params[d].to_f }
 
       if params[:top] < 0 || params[:top] > 1 ||
           params[:bottom] < 0 || params[:bottom] > 1 ||
@@ -490,13 +487,13 @@ class User < ApplicationRecord
         return false
       end
 
-      tempfile_path = "#{Rails.root}/public/data/#{SecureRandom.random_number(2**32)}.avatar.jpg"
+      tempfile_path = "#{tempfile_prefix}.avatar.jpg"
 
       def reduce_and_crop(image_width, image_height, params)
         cropped_image_width = image_width * (params[:right] - params[:left])
         cropped_image_height = image_height * (params[:bottom] - params[:top])
 
-        size = Moebooru::Resizer.reduce_to({ :width => cropped_image_width, :height => cropped_image_height }, { :width => CONFIG["avatar_max_width"], :height => CONFIG["avatar_max_height"] }, 1, true)
+        size = Moebooru::Resizer.reduce_to({ width: cropped_image_width, height: cropped_image_height }, { width: CONFIG["avatar_max_width"], height: CONFIG["avatar_max_height"] }, 1, true)
         size[:crop_top] = image_height * params[:top]
         size[:crop_bottom] = image_height * params[:bottom]
         size[:crop_left] = image_width * params[:left]
@@ -538,20 +535,20 @@ class User < ApplicationRecord
       FileUtils.chmod(0775, avatar_path)
 
       update(
-        :avatar_post_id => params[:post_id],
-        :avatar_top => params[:top],
-        :avatar_bottom => params[:bottom],
-        :avatar_left => params[:left],
-        :avatar_right => params[:right],
-        :avatar_width => size[:width],
-        :avatar_height => size[:height],
-        :avatar_timestamp => Time.now)
+        avatar_post_id: params[:post_id],
+        avatar_top: params[:top],
+        avatar_bottom: params[:bottom],
+        avatar_left: params[:left],
+        avatar_right: params[:right],
+        avatar_width: size[:width],
+        avatar_height: size[:height],
+        avatar_timestamp: Time.now)
     end
   end
 
   module UserTagSubscriptionMethods
     def self.included(m)
-      m.has_many :tag_subscriptions, lambda { order "name" }, :dependent => :delete_all
+      m.has_many :tag_subscriptions, lambda { order "name" }, dependent: :delete_all
     end
 
     def tag_subscriptions_text=(text)
@@ -559,7 +556,7 @@ class User < ApplicationRecord
         tag_subscriptions.clear
 
         text.scan(/\S+/).each do |new_tag_subscription|
-          tag_subscriptions.create(:tag_query => new_tag_subscription)
+          tag_subscriptions.create(tag_query: new_tag_subscription)
         end
       end
     end
@@ -575,8 +572,8 @@ class User < ApplicationRecord
 
   module UserLanguageMethods
     def self.included(m)
-      m.validates_format_of :language, :with => /\A([a-z\-]+)|\z/
-      m.validates_format_of :secondary_languages, :with => /\A([a-z\-]+(,[a-z\0]+)*)?\z/
+      m.validates_format_of :language, with: /\A([a-z\-]+)|\z/
+      m.validates_format_of :secondary_languages, with: /\A([a-z\-]+(,[a-z\0]+)*)?\z/
       m.before_validation :commit_secondary_languages
     end
 
@@ -597,8 +594,8 @@ class User < ApplicationRecord
     end
   end
 
-  validates_presence_of :email, :on => :create if CONFIG["enable_account_email_activation"]
-  validates_uniqueness_of :email, :case_sensitive => false, :on => :create, :if => lambda { |rec| !rec.email.empty? }
+  validates_presence_of :email, on: :create if CONFIG["enable_account_email_activation"]
+  validates_uniqueness_of :email, case_sensitive: false, on: :create, if: lambda { |rec| !rec.email.empty? }
   before_create :set_show_samples if CONFIG["show_samples"]
   has_one :ban
 
@@ -662,8 +659,8 @@ class User < ApplicationRecord
     res = all
 
     res = res.where("name ILIKE ?", "*#{params[:name].tr(" ", "_")}*".to_escaped_for_sql_like) if params[:name].is_a?(String) && params[:name].present?
-    res = res.where(:level => params[:level]) if params[:level] && params[:level] != "any"
-    res = res.where(:id => params[:id]) if params[:id]
+    res = res.where(level: params[:level]) if params[:level] && params[:level] != "any"
+    res = res.where(id: params[:id]) if params[:id]
 
     order =
       case params[:order]

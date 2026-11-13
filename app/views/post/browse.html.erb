@@ -1,21 +1,11 @@
 <% content_for :html_header do %>
-  <script type="text/javascript">
-    if(navigator.platform.indexOf("iPhone") != -1 || navigator.platform == "iPad" || navigator.platform == "iPod") // includes "iPhone Simulator"
-      document.write('<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">');
-    else
-      document.write('<meta name="viewport" content="target-densityDpi=150, user-scalable=0;">');
-
-    if(navigator.platform == "iPad")
-      document.write('<link rel="apple-touch-startup-image" href="<%= image_path "iphone-startup-ipad.png" %>">');
-    else
-      document.write('<link rel="apple-touch-startup-image" href="<%= image_path "iphone-startup.png" %>">');
-  </script>
-
   <meta name="apple-mobile-web-app-capable" content="yes" >
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="application-name" content="<%= CONFIG["app_name"].gsub(".", " ") %>">
   <meta name="application-url" content="/post/browse">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
+  <link rel="apple-touch-startup-image" href="<%= image_path "iphone-startup-ipad.png" %>">
   <link rel="apple-touch-icon" href="<%= image_path "iphone-icon.png" %>">
   <style type="text/css">
     /* iPhone tends to highlight things oddly, sometimes even highlighting the
@@ -25,8 +15,6 @@
 <% end %>
 
 <div id="sizing-body">
-
-<div id="debug2" style="position: fixed; bottom: 100px; background-color: #000;"></div>
 
 <div id="post-browser" class="post-browser" style="display: none;">
   <a style="display: none;" class="browser-thumb-hover-overlay" href="#" tabindex="-1">
@@ -205,7 +193,7 @@
 
       <div class="frame-editor" style="display: none">
         <table class="frame-list" style="margin: 0.5em 0;" cellspacing=0 cellpadding=0><tbody></tbody></table>
-        <a href="#" class="frame-editor-add"><%= t('.frames') %></a>
+        <a href="#" class="frame-editor-add"><%= t('.add') %></a>
       </div>
 
       <div style="background-color: #003; font-size: 125%;">
@@ -225,14 +213,10 @@
 </div>
 
 <script type="text/javascript">
-var debug;
 
 document.observe("dom:loaded", function()
 {
-  debug = new NewDebug();
-
-  InitAdvancedEditing();
-  InitializeFullScreenBrowserHandlers();
+  initializeFullScreenBrowserHandlers();
   Post.init_blacklisted();
 
   var normalize_hash = function(h)
